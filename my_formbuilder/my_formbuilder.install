@@ -1,0 +1,57 @@
+<?php
+
+function my_formbuilder_install(){
+
+	db_query("CREATE TABLE {my_formbuilder_category} (
+		`id` int(11) NOT NULL AUTO_INCREMENT,
+		`parent` int(11) NOT NULL DEFAULT '0',
+		`weight` int(11) NOT NULL DEFAULT '0',
+		`submitter` int(11) NOT NULL DEFAULT '0',
+		`title` varchar(200) COLLATE utf8_bin NOT NULL,
+		`data` blob NOT NULL,
+		`sid` varchar(64) NOT NULL,
+		`deleted`	int(11) NOT NULL DEFAULT '0',
+		`ts` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+		PRIMARY KEY (`id`))"
+	);
+	
+	db_query("CREATE TABLE {my_formbuilder} (
+		`id` int(11) NOT NULL AUTO_INCREMENT,
+		`category` int(11) NOT NULL default 0,			
+		`body` blob NOT NULL,
+		`attachments` text COLLATE utf8_bin NOT NULL,
+		`submitter` int(11) NOT NULL default 0,	
+		`ts` timestamp NOT NULL default CURRENT_TIMESTAMP on update CURRENT_TIMESTAMP,
+		PRIMARY KEY (`id`))"
+	);
+
+	// setting log file & csv file	
+	my_formbuilder_directory_create('my_formbuilder');
+	my_formbuilder_directory_create('my_formbuilder/upload');
+}
+
+function my_formbuilder_uninstall(){
+	db_query("DROP TABLE {my_formbuilder_category}");
+	db_query("DROP TABLE {my_formbuilder}");
+	drupal_set_message("Self-Service database tables are dropped", 'warning');
+}
+
+function my_formbuilder_directory_create($dir_name){
+	$root_dir = $_SERVER['DOCUMENT_ROOT']  . base_path() . file_directory_path() . "/";
+	
+	// if $dir_name doesn't start with the $root_dir than append it
+	if(strncmp($dir_name, $root_dir, strlen($root_dir))){
+		$file_path = $root_dir . $dir_name;
+	}
+	else{
+		$file_path = $dir_name;
+	}
+	
+	if(!file_exists ($file_path)){
+		if(!mkdir($file_path, 0775)){
+			watchdog('google_ad', 'mkdir() is failed for file=[%file]', array('%file' => $file_path), WATCHDOG_ERROR);
+		}
+	}
+}
+
+?>

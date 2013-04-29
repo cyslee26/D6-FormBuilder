@@ -1,0 +1,1207 @@
+<?php
+// $Id:  my_formbuilder module Exp $
+function my_formbuilder_init()
+{		
+	drupal_add_css(drupal_get_path('module', 'my_formbuilder') . '/my_formbuilder.css');	
+	drupal_add_js(drupal_get_path('module', 'my_formbuilder') . '/my_formbuilder.js');
+	
+	
+	module_load_include('inc', 'form_builder', 'includes/form_builder.api');
+	module_load_include('inc', 'form_builder', 'includes/form_builder.cache');
+	
+}
+
+function my_formbuilder_perm()
+{
+	return array('access my_formbuilder', 'my_formbuilder admin'); 
+}
+
+function my_formbuilder_menu() 
+{
+	$items['my_formbuilder'] = array(
+		'title' => t('My Web Form(s) Tools'),		
+		'page callback' => 'my_formbuilder_index_page',
+		'access arguments' => array('access my_formbuilder'),
+	);
+		
+	$items['my_formbuilder/category'] = array(
+		'title' => t('My Web Form(s) Category Management'),		
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('my_formbuilder_overview_categories'),
+		'access arguments' => array('my_formbuilder admin'),
+	);
+	
+	$items['my_formbuilder/category/list'] = array(
+		'title' => 'List',
+		'type' => MENU_DEFAULT_LOCAL_TASK,
+		'access arguments' => array('my_formbuilder admin'),
+		'weight' => -10, // showing as tab 
+	);
+
+	$items['my_formbuilder/category/add'] = array(
+		'title' => t('Create a New Category'),	
+		'page callback' => 'my_formbuilder_form_category_page',		
+		'access arguments' => array('my_formbuilder admin'),
+		'file path' => drupal_get_path('module', 'form_builder'),
+		'file' => 'includes/form_builder.admin.inc',
+		'type' => MENU_LOCAL_TASK, // showing as tab 
+	);
+	
+	$items['my_formbuilder/category/edit/%'] = array(
+		'title' => t('Update Category'),	
+		'page callback' => 'my_formbuilder_form_category_page',
+		'page arguments' => array(3),
+		'access arguments' => array('my_formbuilder admin'),	
+		'file path' => drupal_get_path('module', 'form_builder'),
+		'file' => 'includes/form_builder.admin.inc',
+		'type' => MENU_CALLBACK,
+	);
+	
+	$items['my_formbuilder/category/delete/%'] = array(
+		'title' => t('Delete Category'),	
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('my_formbuilder_form_category_delete', 3),
+		'access arguments' => array('my_formbuilder admin'),		
+		'type' => MENU_CALLBACK,
+	);
+	
+	$items['my_formbuilder/submission'] = array(	
+		'title' => t('My Web Form(s) Submission List'),
+		'description' => 'List of My Web Form(s) submission data list',
+		'page callback' => 'my_formbuilder_submission_list_page',    	
+		'access arguments' => array('access my_formbuilder'),			
+		'type' => MENU_NORMAL_ITEM,	
+	);
+	
+	$items['my_formbuilder/submission/%'] = array(	
+		'title' => t('My Web Form(s) Submission Detail'),
+		'description'      => 'My Web Form(s) Submission Data',
+		'page callback'    => 'my_formbuilder_submission_item_page', 
+		'page arguments'   => array(2),   	
+		'access arguments' => array('access my_formbuilder'),			
+		'type' => MENU_NORMAL_ITEM,	
+	);
+	
+	$items['my_formbuilder/emailform'] = array(
+		'title' => t('OTRS My Web Form(s) Email Form'),		
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('my_formbuilder_email_form'),	
+		'access arguments' => array('access my_formbuilder'),	
+	);
+			
+	$items['my_formbuilder/my_formbuilder_email/%d'] = array(
+		'title' => t('OTRS My Web Form(s) Email Form'),		
+		'page callback' => 'my_formbuilder_callback',
+		'page arguments' => array('my_formbuilder_email', 2),	
+		'access arguments' => array('access my_formbuilder'),	
+	);
+	
+	$items['my_formbuilder/emailform_confirm/%'] = array(
+		'title' => t('OTRS My Web Form(s) Email Form'),		
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('my_formbuilder_email_confirm', 2),	
+		'access arguments' => array('access my_formbuilder'),	
+	);
+	
+	return $items;
+}
+
+function my_formbuilder_index_page(){
+	$breadcrumb = array();
+	$breadcrumb[] = l('Home', '<front>');	
+	$breadcrumb[] = l(t('My Web Form(s)'), 'my_formbuilder');
+	drupal_set_breadcrumb($breadcrumb);	
+	
+	if(HasAccessibleRole(array('form-manage-group'))){
+		$output = "<ul>
+			<li><a href='/my_formbuilder/category'>My Web Form(s) Category List</a></li>
+			<li><a href='/my_formbuilder/category/add'>Create a New My Web Form(s) Category</a></li>
+			<li><a href='/my_formbuilder/submission'>My Web Form(s) Submission List</a></li>	
+			<li><a href='/my_formbuilder/emailform'>Submit My Web Form(s) Request</a></li>
+		</ul>";
+	}
+	elseif(HasAccessibleRole(array('form-submitter-group'))){
+		$output = "<ul>
+			<li><a href='/my_formbuilder/submission'>My Web Form(s) Submission List</a></li>			
+			<li><a href='/my_formbuilder/emailform'>Submit My Web Form(s) Request</a></li>
+		</ul>";
+	}
+	else{
+		$output = "ACCESS Denied";
+	}
+	
+	return $output;
+}
+
+function my_formbuilder_overview_categories(){		
+	drupal_set_title(t('my_formbuilder Category List'));
+	
+	$breadcrumb = array();
+	$breadcrumb[] = l('Lounge', '<front>');	
+	$breadcrumb[] = l(t('My Web Form(s)'), 'my_formbuilder');
+	$breadcrumb[] = l(t('Category List'), 'my_formbuilder/category');
+	drupal_set_breadcrumb($breadcrumb);	
+	
+	drupal_set_message('<p>My Web Form(s) Cateogry is a drop down menu to load dynamic form. You may organize the categories with drag and drop the category items. To change the name or form definition of a category, click the category title link.</p><br />', 'info', FALSE);
+	
+	$data = _my_formbuilder_categories_get_items();
+				
+	$form = array();
+		
+	$form['category'] = array();
+	$form['category']['#tree']= TRUE;
+	$form['category']['#weight'] = 2;
+		
+	foreach($data as $item) {
+		$id     = $item['id'];
+		$title  = $item['title'];
+		$weight = $item['weight'];
+
+		$form['category'][$id] = array(
+			'title'  => array('#type' => 'markup', '#value' => l(t($title), "my_formbuilder/category/edit/$id") ),
+			'weight' => array('#type' => 'weight', '#delta' => count($data) ? count($data) : 10, '#default_value' => $weight),			
+			'id'     => array('#type' => 'hidden', '#value' => $id),
+			'parent' => array('#type' => 'textfield', '#default_value' => $item['parent']),
+			'#depth' => $item['depth'], 
+		);	
+	}
+
+    $form['submit'] = array(
+		'#prefix' => '<br />',
+        '#type'   => 'submit',
+        '#value'  => t('Save Changes'),
+		'#weight' => 3,
+	);
+
+   	return $form;
+}
+
+function my_formbuilder_overview_categories_submit($form, &$form_state){
+	global $user;
+	
+	foreach ($form_state['values']['category'] as $item){
+		db_query('UPDATE {my_formbuilder_category} SET weight=%d, parent=%d, submitter=%d WHERE id = %d LIMIT 1', array($item['weight'], $item['parent'], $user->uid, $item['id']));  		
+	}
+}
+
+function theme_my_formbuilder_overview_categories($form){
+	$table_id = "my_formbuilder-category-table";
+	
+	drupal_add_tabledrag($table_id, 'order', 'sibling', 'weight-group');
+	drupal_add_tabledrag($table_id, 'match', 'parent', 'parent-group', 'parent-group', 'id-group');
+	
+	$header = array('Category Title', 'Weight');
+	
+	foreach (element_children($form['category']) as $key) {
+		$element = &$form['category'][$key];
+		$element['weight']['#attributes']['class'] = 'weight-group';
+		$element['id']['#attributes']['class'] = 'id-group';
+		$element['parent']['#attributes']['class'] = 'parent-group';
+		
+		$row = array();
+		$row[] = theme('indentation', $element['#depth']) . drupal_render($element['title']);		
+		$row[] = drupal_render($element['weight']) . drupal_render($element['id']) . drupal_render($element['parent']) ;
+		
+		$rows[] = array('data' => $row, 'class' => 'draggable');
+	}
+	
+	
+	$output = theme('table', $header, $rows, array('id' => $table_id));
+	$output .= drupal_render($form);
+	
+	return $output;
+}
+
+function my_formbuilder_theme(){
+	return array(
+		'my_formbuilder_overview_categories' => array(
+			'arguments' => array('form' => NULL),
+		),		
+	);
+}
+
+
+function _my_formbuilder_categories_get_items(){
+	$items = array();
+
+	$result = db_query("SELECT id, title, weight, parent FROM {my_formbuilder_category} WHERE deleted=0 ORDER BY weight");
+	while($item = db_fetch_array($result))  {
+		$items[] = $item;
+	}
+		
+	return _my_formbuilder_categories_get_ordered_list(0, $items);
+}
+
+function _my_formbuilder_categories_get_ordered_list($parent, $items, $depth=0){
+	$remnant = array(); 
+	$children = array();
+	foreach ($items as $item) {		
+		if ($item['parent'] == $parent)	{
+			$item['depth'] = $depth;
+			$children[] = $item;
+		}
+		else{
+			$remnant[] = $item;
+		}
+	}
+	// sorting children
+	usort($children, '_my_formbuilder_categories_sort_by_weight');
+	
+	$ancestors = array();
+	foreach ($children as $child) {
+		$child_children = _my_formbuilder_categories_get_ordered_list($child['id'], $remnant, $depth+1);
+		$ancestors[] = $child;
+		if (count($child_children)){
+			$ancestors= array_merge($ancestors, $child_children);
+		}
+	}
+	return $ancestors;
+}
+
+function _my_formbuilder_categories_sort_by_weight($a, $b) {
+	
+	if ($a['weight'] == $b['weight']){
+		return 0;
+	}
+
+	return ($a['weight'] < $b['weight']) ? -1 : 1;
+}
+
+/*
+ *	Category Form Page Functions Section 
+ */
+function my_formbuilder_form_category_page($id=0){
+	$breadcrumb = array();
+	$breadcrumb[] = l('Home', '<front>');
+	$breadcrumb[] = l(t('My Web Form(s)'), 'my_formbuilder');
+	$breadcrumb[] = l(t('Web Form Category List'), 'my_formbuilder/category');
+		
+	if($id){
+		$breadcrumb[] = l(t('Update Category: '.$form_state['values']['title']), 'my_formbuilder/category/edit/'.$category_id);
+	}
+	else{
+		$breadcrumb[] = l(t('New Category'), 'my_formbuilder/category/add');
+	}
+	drupal_set_breadcrumb($breadcrumb);	
+	
+	$form_builder_html = form_builder_interface('my_formbuilder', $id);		
+	$delete_list = array(		
+		'<input type="submit" name="op" id="edit-submit" value="Update"  class="form-submit" />',		
+	);	
+	$form_builder_html = str_replace($delete_list, "", $form_builder_html);
+	
+	$output = drupal_get_form('my_formbuilder_form_category', $id) . '<fieldset style="width:626px"><legend>Form Build Section</legend>' . $form_builder_html . '</fieldset>';
+	
+	return $output;
+}
+
+function my_formbuilder_form_category(&$form_state, $id=0){	
+	if(!empty($id) && ($id > 0)){
+		$result = db_query("SELECT id, title, sid FROM {my_formbuilder_category} WHERE id=%d", $id);
+		$row = db_fetch_object($result);
+		$form_state['values']['title'] = $row->title;
+		$submit_value = 'Update Category';		
+	}
+	else{
+		$submit_value = 'Create a New Category';
+		$id = 0;
+	}
+		
+	$form['meta'] = array(
+		'#type'  => 'fieldset',
+		'#title' => t('Category Information'),
+		'#collapsible' => TRUE,
+		'#collapsed' => FALSE,
+	);
+	$form['meta']['title'] = array(
+		'#title' => t('Category Title'),
+		'#type'  => 'textfield',
+		'#default_value' => isset($form_state['values']['title']) ? $form_state['values']['title'] : '',
+		'#description'  => t('maximum character length is 200'),
+		'#maxlength' => 200,
+		'#size' => 60,
+		'#required' => TRUE,
+	);
+	
+	$form['meta']['id'] = array(
+		'#type' => 'hidden',
+		'#value' => $id,
+	);
+		
+	$form['meta']['submit'] = array(
+		'#type'  => 'submit',
+		'#value' => $submit_value,		
+	);
+	
+	$form['meta']['delete'] = array(
+		'#type'  => 'submit',
+		'#value' => t('Delete Category'),
+		'#access' => $id ? TRUE : FALSE,		
+	);
+
+	return $form;
+}
+
+function my_formbuilder_form_category_submit($form, &$form_state){
+	global $user;
+		
+	$id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+		
+	if($_POST['op'] === 'Delete'){
+		drupal_goto('my_formbuilder/category/delete/'.$id);
+	}
+	
+	$title = isset($_POST['title']) ? $_POST['title'] : '';
+	$sid   = session_id();
+	$my_formbuilder_form = db_result(db_query("SELECT data FROM {form_builder_cache} where type='my_formbuilder' AND form_id='%d' ORDER BY updated DESC LIMIT 1", $id));
+		
+	if($id){
+		db_query("UPDATE {my_formbuilder_category} SET title='%s', submitter=%d, sid='%s', data='%s' WHERE id=%d", $title, $user->uid, $sid, $my_formbuilder_form, $id);
+		
+		drupal_set_message(t('Updated category %name.', array('%name' => $title)), 'warning');
+	}
+	else{
+		db_query("INSERT INTO {my_formbuilder_category} (title, submitter, parent, weight, sid, data) VALUES ('%s', %d, 0, 1, '%s', '%s') ", $title, $user->uid, $sid, $my_formbuilder_form);
+			
+		drupal_set_message(t('Created new category %name.', array('%name' => $title)), 'warning');					
+	}
+	
+	// delete from cache: when the page is load, the tool always looks for the cache table first than call the load function 
+	form_builder_cache_delete('my_formbuilder', $id);
+	
+	drupal_goto('my_formbuilder/category/list');
+}
+
+function my_formbuilder_form_category_delete(&$form_state, $id)
+{
+	if(!$id){
+		$message = t('Invalid category id value.  can\'t delete category');
+	}
+	else{
+		$category_title = db_result(db_query("SELECT title FROM {my_formbuilder_category}  WHERE id=%d", $id));
+		$message = t('Would you like to delete category, "'.$category_title.'" ?');
+	}
+	
+	$form['note'] = array(		
+		'#type'   => 'markup',
+		'#value'  => '<p>' . $message . '</p>', 
+	);
+	
+	$form['category_id'] = array(
+		'#type'   => 'hidden',
+		'#value'  => $id,
+		'#access' => $id ? TRUE : FALSE,
+	);
+	
+	$form['delete_cat_yes'] = array(
+		'#type'  => 'submit',
+		'#value' => 'Yes',
+		'#access' => $id ? TRUE : FALSE,
+	);
+	
+	$form['delete_cat_no'] = array(
+		'#type'  => 'submit',
+		'#value' => 'No',
+		'#access' => $id ? TRUE : FALSE,
+	);
+	
+	return $form;
+}
+
+function my_formbuilder_form_category_delete_submit($form, &$form_state){
+	global $user;
+	
+	$id = isset($_POST['category_id'])? intval($_POST['category_id']) : 0;
+	$category_title = db_result(db_query("SELECT title FROM {my_formbuilder_category}  WHERE id=%d", $id));
+	
+	if($id && ($_POST['op'] === 'Yes')){		
+		db_query("UPDATE {my_formbuilder_category} SET deleted=%d, submitter=%d WHERE id=%d", time(), $user->uid, $id);
+		
+		drupal_set_message(t('"@TITLE" is deleted.', array('@TITLE' => $category_title)), 'warning');
+	}
+	else{
+		if($_POST['op'] === 'No'){
+			drupal_set_message(t('Cancled category deletion for "@TITLE"', array('@TITLE' => $category_title)), 'warning');
+		}
+		else{
+			drupal_set_message('Can not delete category due to invalid category id value', 'error');
+		}
+	}	
+	
+	drupal_goto('my_formbuilder/category/list');
+}
+
+
+/*
+ *	My Web Form(s) Guide Form Submission: It will send out email to OTRS
+ */
+
+function my_formbuilder_email_form($form_state, $category_id=0){		
+	$form = array();	
+	$form['#attributes']['enctype'] = 'multipart/form-data';
+	
+	$options[0] = t('- Please choose -');
+	$data = _my_formbuilder_categories_get_items();
+	foreach($data as $item) {		
+		$depth  = isset($item['depth']) ? intval($item['depth']) : 0;
+				
+		$choice = new stdClass();
+        $choice->option = array($item['id'] => str_repeat('-', ($depth * 2)). " " . $item['title']);
+        $options[] = $choice;
+	}
+	
+	$form['category_wrapper'] = array(
+		'#type'   => 'fieldset',
+		'#title'  => t('Category'),
+		'#collapsible' => FALSE,
+		'#weight' => 1,	
+	);
+	$form['category_wrapper']['categories'] = array(
+		'#type'          => 'select',
+		'#title'         => t('Categories'),
+		'#options'       => $options,
+		'#default_value' => $category_id,
+		'#weight'		 => 2,	
+		'#required'      => TRUE,			
+		'#description' => t('Please select category that you want to report the problem before click submit'),	
+	);
+	$form['category_wrapper']['submit'] = array(
+		'#type' => 'submit',
+		'#value' => t('Load Category Form'),		
+		'#weight'=> 3,	
+	);
+		
+	if($category_id){		
+		$data = db_result(db_query("SELECT data FROM {my_formbuilder_category} WHERE id=%d", $category_id));
+		
+		$item_form = array('#tree' => TRUE);
+		$item_form = unserialize($data);		
+				
+		$form['my_formbuilder_email_wrapper'] = array(			
+			'#type'   => 'markup',				
+			'#weight' => 4,				
+			'#prefix' => '<div id="my_formbuilder-category-form-fieldset">',
+			'#suffix' => '</div>',			
+		);
+		
+		$formbuilder_form = my_formbuilder_get_formbuilder_item($item_form, $form_state);
+		$form['my_formbuilder_email_wrapper'][] = $formbuilder_form;
+		$form_state['storage']['my_formbuilder_email'] = $formbuilder_form;
+		
+							
+		$form['submit'] = array(
+			'#id'   => 'submit-email',
+			'#type' => 'submit',
+			'#value' => t('Submit'),		
+			'#weight'=> 6,	
+		);
+	}
+		
+	return $form;
+}
+
+function my_formbuilder_get_formbuilder_item($form, $form_state){
+	$data = array();
+	
+	foreach($form as $key => $form_data){			
+		if(!count($form_data) || empty($form_data)){				
+			continue;
+		}
+											
+		switch($form_data['#type'])
+		{
+			case 'file':
+				$data[$key] = $form_data;				
+				$data[$key]['#suffix'] = '<div id="maxfile-note">You may upload up to 5 files at once. Maximum file upload size is ' . $form_data['#max_filesize'] . '</div>';		
+				$data[$key]['#attributes'] = array('multiple' => 'true');	
+				$data[$key."_max_filesize"] = array(	
+					'#type' => 'hidden',
+					'#value' => $form_data['#max_filesize'], 													
+					'#attributes' => array('class' => 'max-filesize'),														
+				);							
+				break;
+				
+			case 'select':
+			case 'checkboxes':
+			case 'radios':					
+				$data[$key] = $form_data;										
+				if(isset($form_data['#othertextarea']) && $form_data['#othertextarea']){		
+					$keyid = str_replace("new_", "", $key);		
+					$label = isset($form_data['#othertextarea_title']) ? $form_data['#othertextarea_title'] : 'Please describe your reason to choose option <i>' .$form_data['#othertextarea_optval'] . '</i>';  		
+					$data[$key]['#suffix'] = '<div id="edit-new-'.$keyid.'-extranote-wrapper">
+				<label class="extranote-label">'.$label.'</label>
+				<textarea cols="60" rows="5" name="new_'.$keyid.'_extranote" id="edit-new-'.$keyid.'-extranote"  class="extranote-textarea"></textarea>
+				</div>';
+				
+					$data[$key."_extranote_option"] = array(	
+						'#type' => 'hidden',								
+						'#value' => isset($form_data['#othertextarea_optval'])?$form_data['#othertextarea_optval']: 'other', 													
+					);	
+				}								
+				break;	
+					
+				
+			case 'fieldset':				   						
+				$data[$key] = my_formbuilder_get_formbuilder_item($form_data, $form_state);										
+				break;
+			
+			default:			   
+				$data[$key] = $form_data;								
+				break;
+		}						
+	}
+	
+	return $data;
+}
+
+function my_formbuilder_email_form_validate($form, &$form_state){	
+	$category = isset($_POST['categories']) ? intval($_POST['categories']) : 0;
+	
+	if(($_POST['op'] === 'Load Category Form') && $category){
+		// skip validation when category form is loading & clear any error message		
+		form_set_error(NULL, FALSE, TRUE);
+		drupal_get_messages('error', true);
+		drupal_goto('my_formbuilder/emailform/'.$category);
+	}
+	
+	if(isset($_FILES)){
+		$file_key = key($_FILES);		
+		if(!empty($_FILES[$file_key]['name'][0]))
+		{	
+			$num_uploaded_files = count($_FILES[$file_key]['name']);
+			$max_size = $form_state['storage']['my_formbuilder_email'][$file_key]['#max_filesize'];
+			
+			// checking maximum upload files are 5
+			if($num_uploaded_files > 5){
+				form_set_error($file_key, "You can't upload more than 5 files", TRUE);
+				return;
+			}
+
+			// clear any error message
+			form_set_error(NULL, FALSE, TRUE);
+			drupal_get_messages('error', true);
+						
+			$error_message = '';
+			for($i = 0; $i < $num_uploaded_files; $i++){
+				$upload_filesize = $_FILES[$file_key]['size'][$i];
+				if($upload_filesize > $max_size){						
+					$error_message .= "<li>".$_FILES[$file_key]['name'][$i]." file size is bigger than ".$max_size."</li>";
+				}	
+			}
+			if(!empty($error_message)){
+				form_set_error($file_key, $error_message, TRUE);
+			}
+		}
+	}
+	
+}
+
+function my_formbuilder_get_unique_filename($filename){
+	global $user;
+		
+	$file_info = pathinfo($filename);
+	
+	//make unique filename with using the user id & current time : remove punctuations from filename 
+	$file['filename'] = sprintf("%d_%d_%s.%s", $user->uid, time(), preg_replace('/[^0-9a-z]/i', '-', $file_info['filename']), $file_info['extension']);
+	$file['fullpath'] = sprintf("%s%s%s/my_formbuilder/upload/%s", $_SERVER['DOCUMENT_ROOT'], base_path(), file_directory_path(), $file['filename']);
+	$file['link']     = sprintf("http://%s/files/my_formbuilder/upload/%s", $_SERVER['HTTP_HOST'], $file['filename']);
+		
+	return $file;
+}
+
+function my_formbuilder_email_form_submit($form, &$form_state){
+	global $user;
+		
+	if($_POST['op'] === 'Submit'){	
+		$fid = 0;		
+		$file_link = '';
+	
+		if(isset($_FILES)){
+			$file_key = key($_FILES);
+			if(!empty($_FILES[$file_key]['name'][0])){	
+				$upload_links = array();
+				$upload_files = array();
+						
+				foreach($_FILES[$file_key]["error"] as $key => $error) {	
+					$tmp_name = $_FILES[$file_key]["tmp_name"][$key];				
+					$file = my_formbuilder_get_unique_filename($_FILES[$file_key]["name"][$key]);
+			
+					if(move_uploaded_file($tmp_name, $file['fullpath'])){
+						$upload_links[] = '<a href="'.$file['link'].'" target="_blank">' . $file['filename'] . '</a>';
+						$upload_files[] = $file['filename'];
+					}			
+				}
+			}
+		}
+		
+		$skip_keys   = array('form_build_id','form_token', 'form_id', 'op', 'categories');
+		$category_id = isset($_POST['categories']) ? intval($_POST['categories']) : 0;
+	
+		if($category_id){			
+			$category_title = db_result(db_query("SELECT title FROM {my_formbuilder_category} WHERE id=%d", $category_id));
+			$user_info = user_load(array('uid' => $user->uid));
+			if($user->name === 'admin'){
+				$username = 'Administrator';
+			}
+			else{
+				$username = $user_info->firstname." " .$user_info->lastname;
+			}
+						
+			$output = array();
+			foreach($_POST as $key => $value){									
+				if(!in_array($key, $skip_keys)){
+				    $search_item = array('key' => $key, 'value' => $_POST[$key]);					
+					form_builder_name_value($search_item, $form_state['storage']['my_formbuilder_email'], $output);					
+				}			
+			}
+		
+			$html = '<p><b>Subject:</b> '.$category_title . "</p>\n";
+			foreach($output as $index => $data){
+				$html .= '<p><b>' . $data['name'].':</b> '. $data['value'] . "</p>\n";
+			}
+					
+			for($i = 0; $i < count($upload_links); $i++){
+				$html .= '<p><b>File Attachment '.($i+1).':</b> '. $upload_links[$i] . "</p>\n";				
+			}
+			
+			// Extra Information 
+			$html .= '<p><b>Submitter Name:</b> '. $username . "</p>\n"; 
+			$html .= '<p><b>Submitter email:</b> '.$user->name. "</p>\n";
+						
+			if(count($upload_files)){
+				$attachment = join("|", $upload_files);
+			}
+			else{
+				$attachment = '';
+			}
+			db_query("INSERT INTO {my_formbuilder} (category, body, submitter, attachments) VALUES (%d, '%s', %d, '%s')", $category_id, $html, $user->uid, $attachment);
+		
+			$last_inserted_id = db_last_insert_id('{my_formbuilder}', 'id');
+			
+			drupal_goto('my_formbuilder/emailform_confirm/'.$last_inserted_id);			
+		}
+	}		
+}
+
+function form_builder_name_value($search_item, $list, &$output){
+    if(preg_match('/^new_(\d+)_extranote$/', $search_item['key'], $matches)){
+		$output[] = array('name' => 'Other Option Description', 'value'=> str_replace("\n", "<br>", htmlspecialchars($search_item['value'])) );
+		return;
+	}
+	
+	if(preg_match('/^new_(\d+)_max_filesize$/', $search_item['key'], $matches)){		
+		return;
+	}
+	
+	foreach($list as $list_key => $list_item){
+		if($list_key === $search_item['key']){			
+			$name = $list_item['#title'];
+						
+			switch($list_item['#type']){
+				case 'checkboxes':
+				case 'select':
+				case 'radios':
+				 	$options_keys = array_keys($list_item['#options']);
+					if(is_array($search_item['value'])){
+						foreach($search_item['value'] as $val){							
+							if(!in_array($val, $options_keys)){
+								foreach($options_keys as $optgrp_name){
+									if(is_array($list_item['#options'][$optgrp_name])){
+										$optgrp_keys = array_keys($list_item['#options'][$optgrp_name]);
+										if(in_array($val, $optgrp_keys)){
+											$values[] = $optgrp_name . ' ' . $list_item['#options'][$optgrp_name][$val];
+											break;
+										}
+									}
+								}
+							}
+							else{
+								$values[] = $list_item['#options'][$val];	
+							}					
+						}
+						$value = join(", ", $values);
+					}
+					else{
+						$value = $list_item['#options'][$search_item['value']];
+					}
+					
+				break;
+				
+				default:
+					$value = $search_item['value'];				
+			}
+			
+			$name = htmlspecialchars($name);
+			$value = htmlspecialchars($value);
+			$value = str_replace("\n", "<br>", $value);
+			
+			$output[] = array('name' => $name, 'value'=> $value);			
+			return;
+		}
+		else{			
+			if($list_item['#type'] === 'fieldset'){
+				form_builder_name_value( $search_item, $list_item, $output);
+			}
+		}
+	}
+}
+
+function my_formbuilder_email_confirm(&$form_state){
+	$form = array();
+	$page_arguments = func_get_args();
+	$id = intval($page_arguments[1]);
+	if($id){
+		$result = db_query("SELECT body, category FROM {my_formbuilder} WHERE id=%d", $id);
+		$row    = db_fetch_object($result);
+		
+		$form['confirm_message'] = array(
+			'#value' => t('Would you like to submit below information to OTRS?'),
+		);	
+		
+		$form['id'] = array(
+			'#type'  => 'hidden',
+			'#value' => $id,
+		);	
+		
+		$form['cat_id'] = array(
+			'#type'  => 'hidden',
+			'#value' => intval($row->category),
+		);	
+		
+		
+		$form['confirm_yes'] = array(
+			'#id'    => 'confirm-yes',
+			'#type'  => 'submit',
+			'#value' => t('Yes'),
+		);	
+		
+		$form['confirm_no'] = array(
+			'#id'    => 'confirm-no',
+			'#type'  => 'submit',
+			'#value' => t('No'),
+		);	
+				
+		$form['data'] = array(
+			'#prefix' => '<fieldset><legend> Email Message </legend>',	
+			'#suffix' => '</fieldset>',		
+			'#value'  => $row->body,	
+			'#prefix' => '<div class="my_formbuilder-email-message">',
+			'#suffix' => '</div>',	
+		);
+		
+	}
+	else{
+		drupal_set_message('Can not generate email to report the OTRS problem', 'error');	
+	}
+	return $form;
+}
+
+function my_formbuilder_email_confirm_submit($form, &$form_state){
+	$button_id   = $form_state['clicked_button']['#id'];
+	$skip_keys   = array('form_build_id','form_token', 'form_id', 'op', 'categories');
+	
+	switch($button_id){
+		case 'confirm-yes':
+			my_formbuilder_send_email_to_otrs($_POST['id']);						
+		break;
+		
+		case 'confirm-no':
+			drupal_set_message('Canceled your submition', 'warning');			
+		break;
+	}	
+	
+	drupal_goto('my_formbuilder/emailform');
+}
+
+
+function my_formbuilder_send_email_to_otrs($id){
+	include_once('/usr/local/lib/php/phpMailer/class.phpmailer.php');
+	global $user;
+	
+	$result = db_query("SELECT body, title, attachments FROM {my_formbuilder}  LEFT JOIN {my_formbuilder_category} ON {my_formbuilder}.category = {my_formbuilder_category}.id WHERE {my_formbuilder}.id=%d", $id);
+	$db_data = db_fetch_object($result);
+	
+	if(empty($db_data->body)){
+		drupal_set_message('Can not find proper email body', 'error');
+		return;
+	}
+		
+	// Form 
+	$user_info = user_load(array('uid' => $user->uid));
+	if($user->name === 'admin'){
+		$username = 'Administrator';
+	}
+	else{
+		$username = $user_info->firstname." " .$user_info->lastname;
+	}
+	
+	// Subject & TO Address
+	$to_address = 'team@emailadress'; // admin or team email address 
+	$subject = 'My Web Form(s) Submission: ' . $db_data->title;
+	$cc_list = array($user->name);
+										
+	$mailer = new PHPMailer();
+	$mailer->From = $user->name;
+	$mailer->FromName = $username;		
+	$mailer->AddAddress($to_address);		
+	$mailer->ContentType = 'text/html';	
+	$mailer->Subject = $subject;
+	
+	// Add CC
+	for($i = 0; $i < count($cc_list); $i++){
+		$mailer->AddCC($cc_list[$i]); // copy to user
+	}
+	
+	// attachments 
+	if(!empty($db_data->attachments)){
+		$doc_root = $_SERVER['DOCUMENT_ROOT']  . base_path() . file_directory_path() . "/my_formbuilder/upload/";
+		
+		$files = explode("|", $db_data->attachments);
+		foreach($files as $file){
+			$attachment = $doc_root . $file;			
+			
+			if(file_exists($attachment)){				
+				$mailer->AddAttachment($attachment);
+			}			
+		}
+	}
+		
+	$mailer->Body = $db_data->body;
+	
+	if (!$mailer->Send()) {
+		watchdog('my_formbuilder', "Faile to send email [to: %TO] [subject: %SUBJECT] [%BODY]", array('%TO' => $to_address, '%SUBJECT' => $mailer->Subject, '%BODY' => $mailer->Body), WATCHDOG_ERROR);
+	}
+	watchdog('my_formbuilder', "send email tracking [to: %TO] [subject: %SUBJECT] [%BODY]", array('%TO' => $to_address, '%SUBJECT' => $mailer->Subject, '%BODY' => $mailer->Body), WATCHDOG_INFO);	
+	unset($mailer);
+	
+	drupal_set_message('Thanks for your submission. Support will respond to you via email. Please check your email for the ticket number for this request, for future reference.', 'warning');
+}
+
+function my_formbuilder_submission_list_page()
+{
+	global $user;
+	
+	if(HasAccessibleRole(array('form-submitter-group'))){
+		$sql = 'SELECT {my_formbuilder}.id, title, {my_formbuilder}.submitter, {my_formbuilder}.ts FROM {my_formbuilder}  LEFT JOIN {my_formbuilder_category} ON {my_formbuilder}.category = {my_formbuilder_category}.id WHERE {my_formbuilder}.submitter="'.$user->uid.'"';
+	}
+	elseif(HasAccessibleRole(array('form-manage-group'))){
+		$sql = 'SELECT {my_formbuilder}.id, title, {my_formbuilder}.submitter, {my_formbuilder}.ts FROM {my_formbuilder} LEFT JOIN {my_formbuilder_category} ON {my_formbuilder}.category = {my_formbuilder_category}.id';
+	}
+	else{
+		$output = "Access Denied";
+		return $output;
+	}
+	
+	
+	$limit = 25;
+	$header = array(
+		array('data' => t('Category Title'), 'field' => 'title'), 
+		array('data' => t('Submitted By'), 'field' => 'submitter'),		
+		array('data' => t('Date'), 'field' => 'ts', 'sort' => 'desc'),		
+		array('data' => t('Action')), 		
+	);
+	
+	$tablesort = tablesort_sql($header);
+	$result    = pager_query($sql . $tablesort, $limit);
+	$rows      = array();
+	
+	while ($item = db_fetch_object($result)) {
+		$user_info = user_load(array('uid' => $item->submitter));
+		
+		$rows[] = array($item->title, strstr($user_info->mail, "@", TRUE), $item->ts, l('View Detail', 'my_formbuilder/submission/'.$item->id));
+	}
+	
+	if(!$rows) {
+		$rows[] = array(array('data' => t('No data is found'), 'colspan' => 4));
+	}
+	
+	$breadcrumb = array();
+	$breadcrumb[] = l('Home', '<front>');
+	$breadcrumb[] = l(t('My Web Form(s)'), 'my_formbuilder');
+	$breadcrumb[] = l(t('Submission List'), 'my_formbuilder/submission');
+	drupal_set_breadcrumb($breadcrumb);	
+	
+	$output .= theme('table', $header, $rows);
+	$output .= theme('pager', NULL, $limit, 0);
+ 
+	return $output;
+}
+
+function my_formbuilder_submission_item_page($id){
+	$breadcrumb = array();
+	$breadcrumb[] = l('Home', '<front>');
+	$breadcrumb[] = l(t('My Web Form(s)'), 'my_formbuilder');
+	$breadcrumb[] = l(t('Submission List'), 'my_formbuilder/submission');
+	$breadcrumb[] = t('Submission Detail');
+	drupal_set_breadcrumb($breadcrumb);	
+
+	$output = '';
+	if($id){
+		$content = db_result(db_query("SELECT body FROM {my_formbuilder} WHERE id=%d", $id));
+		
+		$output  = '<div class="my_formbuilder-email-message">'. $content . '</div>';		
+	}
+	return $output;	
+}
+
+/*******************************************************************
+ *	form_builder hook function sction 
+ *******************************************************************/
+ 
+/**
+ * Implementation of hook_form_builder_types().
+ */
+function my_formbuilder_form_builder_types() {
+	$fields = array();
+	
+	$fields['fieldset'] = array(
+    'title' => t('Fieldset'),
+    'properties' => array(
+      'title',
+      'description',
+      'collapsible',
+      'collapsed',
+    ),
+    'default' => array(
+      '#title' => t('New fieldset'),
+      '#type' => 'fieldset',
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+    ),
+  );
+  
+	$fields['textfield'] = array(
+		'title' => t('Textfield'),
+		'properties' => array(
+			'title',
+			'description',
+			'field_prefix',
+			'field_suffix',
+			'default_value',
+			'required',
+			'size',
+		),
+		'default' => array(
+			'#title' => t('New textfield'),
+			'#type' => 'textfield',
+		),
+	);
+
+	$fields['textarea'] = array(
+		'title' => t('Textarea'),
+		'properties' => array(
+			'title',
+			'description',
+			'default_value',
+			'required',
+			'rows',
+			'cols',
+			'input_format',
+		),
+		'default' => array(
+			'#title' => t('New textarea'),
+			'#type' => 'textarea',
+		),
+	);
+	
+	$fields['select'] = array(
+		'title' => t('Select list'),
+		'properties' => array(
+			'title',
+			'description',
+			'default_value',
+			'required',
+			'options',			
+			'multiple', // Handled by options element.
+			'key_type', // Handled by options element.
+			'key_type_toggle', // Handled by options element.
+			'key_type_toggled', // Handled by options element.
+			'othertextarea',
+			'othertextarea_title',
+			'othertextarea_optval',
+		),
+		'default' => array(
+			'#title' => t('New select list'),
+			'#type' => 'select',
+			'#options' => array('1' => 'one', '2' => 'two', '3' => 'three'),
+			'#multiple_toggle' => TRUE,
+		),
+	);
+ 
+	$fields['checkboxes'] = array(
+		'title' => t('Checkboxes'),
+		'properties' => array(
+			'title',
+			'description',
+			'default_value',
+			'required',
+			'options',
+			'multiple',			
+			'key_type', // Handled by options element.
+			'key_type_toggle', // Handled by options element.
+			'key_type_toggled', // Handled by options element.
+			'othertextarea',
+			'othertextarea_title',
+			'othertextarea_optval',
+		),
+		'default' => array(
+			'#title' => t('New checkboxes'),
+			'#type' => 'checkboxes',
+			'#options' => array('one' => 'one', 'two' => 'two', 'three' => 'three'),
+		),
+	);
+
+	$fields['radios'] = array(
+		'title' => t('Radios'),
+		'properties' => array(
+			'title',
+			'description',
+			'default_value',
+			'required',
+			'options',			
+			'key_type', // Handled by options element.
+			'key_type_toggle', // Handled by options element.
+			'key_type_toggled', // Handled by options element.
+			'othertextarea',
+			'othertextarea_title',
+			'othertextarea_optval',
+		),
+		'default' => array(
+			'#title' => t('New radios'),
+			'#type' => 'radios',
+			'#options' => array('one' => 'one', 'two' => 'two', 'three' => 'three'),
+		),
+	);
+
+	$fields['file'] = array(
+		'title' => t('File'),
+		'properties' => array(
+			'title',
+			'description',
+			'required',
+			'max_filesize',
+		),
+		'default' => array(
+			'#title' => t('New file'),
+			'#type' => 'file',
+			'#size' => 35,
+			'#max_filesize' => 3000000,
+		),
+	);
+	
+	return array(
+		'my_formbuilder' => $fields,
+	);
+}
+
+/*
+ *	form_builder hook function: hook_form_builder_load
+ */
+function my_formbuilder_form_builder_load($form_type, $form_id) {
+	$form = array();	
+	
+	if ($form_type == 'my_formbuilder') {
+		if($form_id){
+			$data = db_result(db_query("SELECT data FROM {my_formbuilder_category} WHERE id=%d", $form_id));			
+			$form = unserialize($data);			
+		}
+		else{
+			$form = array();	
+		}					
+	}	
+	
+	return $form;	
+}
+
+/*
+ *	form_builder hook function: hook_form_builder_properties
+ */
+function my_formbuilder_form_builder_properties($form_type){
+	return array(
+		'max_filesize' => array(
+			'form' => 'my_formbuilder_form_builder_property_max_filesize_form',
+		),
+		'othertextarea' => array(
+			'form' => 'my_formbuilder_form_builder_property_othertextarea_form',
+		),
+		'othertextarea_optval' => array(
+			'form' => 'my_formbuilder_form_builder_property_othertextarea_optval_form',
+		),
+		'othertextarea_title' => array(
+			'form' => 'my_formbuilder_form_builder_property_othertextarea_title_form',
+		),
+		
+	);
+}
+
+
+/**
+ * Configuration form for the "max_filesize" property.
+ */
+function my_formbuilder_form_builder_property_max_filesize_form(&$form_state, $form_type, $element, $property) {
+	$form = array();
+	
+	$form['max_filesize'] = array(
+		'#form_builder' => array('property_group' => 'Properties'),
+		'#type' => 'textfield',
+		'#size' => 6,
+		'#title' => t('Max Uplaod File Size'),
+		'#default_value' => $element['#max_filesize'],
+		'#weight' => 3,
+	);
+
+  return $form;
+}
+
+
+/**
+ * Configuration form for the "extra_note" property.
+ */
+function my_formbuilder_form_builder_property_othertextarea_form(&$form_state, $form_type, $element, $property) {
+	$form = array();
+	
+	$form['othertextarea'] = array(
+		'#form_builder' => array('property_group' => 'Properties'),
+		'#type' => 'checkbox',
+		'#default_value' => isset($element['#othertextarea']) ? $element['#othertextarea'] : 0,
+		'#title' => t('Display auto-populated text form when a user select a other option'),
+		'#weight' => 3,
+	);
+	
+	return $form;
+}
+/**
+ * Configuration form for the "extra_note" property.
+ */
+function my_formbuilder_form_builder_property_othertextarea_optval_form(&$form_state, $form_type, $element, $property) {
+	$form = array();
+	
+	$form['othertextarea_optval'] = array(
+		'#form_builder' => array('property_group' => 'Properties'),
+		'#type' => 'textfield',
+		'#size' => 20,
+		'#title' => t('Auto-populated option value'),
+		'#default_value' => isset($element['#othertextarea_optval']) ? $element['#othertextarea_optval'] : 'other',
+	);
+	
+	return $form;
+}
+
+/**
+ * Configuration form for the "extra_note" property.
+ */
+function my_formbuilder_form_builder_property_othertextarea_title_form(&$form_state, $form_type, $element, $property) {
+	$form = array();
+	
+	$form['othertextarea_title'] = array(
+		'#form_builder' => array('property_group' => 'Properties'),
+		'#type' => 'textfield',
+		'#size' => 60,
+		'#title' => t('Auto-populated textarea title'),
+		'#default_value' => isset($element['#othertextarea_title']) ? $element['#othertextarea_title'] : 'Please describe your reason to choose option <i>' .$element['#othertextarea_optval'].'</i>',
+	);
+	
+	return $form;
+}
+
+?>

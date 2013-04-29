@@ -1,0 +1,6 @@
+; $Id: rc.info,v 1.2 2010/12/02 clee Exp $
+name = my_formbuilder
+description = user may generating dynamic forms, such as survey.
+core = 6.x
+package = Auxiliary Plug-ins
+dependencies[] = form_builder

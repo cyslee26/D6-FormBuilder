@@ -1,0 +1,19 @@
+#form-builder-fields{
+	width: 100px;
+}
+#form-builder-field-palette {
+	width: 100px;
+}
+
+.em_label{
+	font-weight:bold;
+}
+
+.my_formbuilder-email-message p{
+	padding-bottom: 10px;
+}
+
+#maxfile-note{
+	font-size: 10px;
+	padding-bottom: 5px;
+}
