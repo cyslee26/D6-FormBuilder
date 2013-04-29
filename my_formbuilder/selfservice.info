@@ -1,6 +1,0 @@
-; $Id: rc.info,v 1.2 2010/12/02 clee Exp $
-name = Self-Service
-description = Staff generating dynamic forms and user submit the form data to report the problem.  
-core = 6.x
-package = Auxiliary Plug-ins
-dependencies[] = form_builder
